@@ -517,17 +517,25 @@ function updateStdStats(){
   document.getElementById("absHigh").textContent = isFinite(hi)?fmt(hi,3):"-";
   // outlier flag: any standard whose epsilon is >12% off the median
   const fEl=document.getElementById("stdFlag");
-  const vs=validStandards();
   if(fEl){
+    const warns=[];
+    const vs=validStandards();
+    // epsilon outlier: any standard whose epsilon is >12% off the median
     if(vs.length>=4){
       const e=vs.map(s=>s.eps).sort((a,b)=>a-b);
       const med=e.length%2? e[(e.length-1)/2] : (e[e.length/2-1]+e[e.length/2])/2;
       const out=vs.filter(s=>med>0 && Math.abs(s.eps-med)/med>0.12);
-      if(out.length){
-        fEl.className="spreadflag"; fEl.style.display="";
-        fEl.innerHTML="🚩 Heads up: "+out.map(s=>"Standard "+s.n+"'s epsilon ("+fmt(s.eps,2)+") is "+fmt(Math.abs(s.eps-med)/med*100,0)+"% off from the others").join("; ")+". Double check that absorbance - it might be a typo or a bad tube.";
-      } else { fEl.style.display="none"; fEl.innerHTML=""; }
-    } else { fEl.style.display="none"; fEl.innerHTML=""; }
+      if(out.length) warns.push("Epsilon looks off for "+out.map(s=>"Standard "+s.n+" ("+fmt(s.eps,2)+", "+fmt(Math.abs(s.eps-med)/med*100,0)+"% off)").join(", ")+". Might be a typo or a bad tube.");
+    }
+    // consecutive absorbances too close: each step should be about 0.1
+    const ord=S.standards.map(s=>({n:s.n, a:num(s.abs)}));
+    for(let i=0;i<ord.length-1;i++){
+      const A=ord[i], B=ord[i+1];
+      if(isFinite(A.a)&&isFinite(B.a) && Math.abs(B.a-A.a)<0.07)
+        warns.push("Standards "+A.n+" and "+B.n+" are only "+fmt(Math.abs(B.a-A.a),3)+" apart (they should be about 0.1). Looks a little off - you might want to redo those.");
+    }
+    if(warns.length){ fEl.className="spreadflag"; fEl.style.display=""; fEl.innerHTML="🚩 "+warns.join("<br>🚩 "); }
+    else { fEl.style.display="none"; fEl.innerHTML=""; }
   }
 }
 
@@ -568,7 +576,7 @@ function renderUnknowns(){
       '<td><input class="cell purple" type="number" step="any" id="ueps-'+i+'" value="'+u.epsOverride+'" placeholder="'+(isFinite(c.epsAuto)?fmt(c.epsAuto,2):'auto')+'" oninput="upUnk('+i+",'epsOverride',this.value)\"><span id=\"umatch-"+i+'">'+c.matchTxt+"</span></td>"+
       '<td class="calc" id="uconc-'+i+'">'+sci(c.conc)+"</td>"+
       '<td class="calc" id="ugrams-'+i+'">'+fmt(c.grams,5)+"</td>"+
-      '<td class="calc lead" id="upct-'+i+'">'+(isFinite(c.massPct)?fmt(c.massPct,6)+" %":"-")+"</td>"+
+      '<td class="calc lead" id="upct-'+i+'">'+(isFinite(c.massPct)?fmt(c.massPct,9)+" %":"-")+"</td>"+
       '<td id="upill-'+i+'">'+c.pill+"</td>"+
       '<td><button class="rowbtn" title="remove" onclick="delUnk('+i+')">&times;</button></td>';
     tb.appendChild(tr);
@@ -583,7 +591,7 @@ function recomputeUnknownRow(i){
   const ep=document.getElementById("ueps-"+i); if(ep) ep.placeholder=isFinite(c.epsAuto)?fmt(c.epsAuto,2):"auto";
   document.getElementById("uconc-"+i).textContent=sci(c.conc);
   document.getElementById("ugrams-"+i).textContent=fmt(c.grams,5);
-  document.getElementById("upct-"+i).textContent=isFinite(c.massPct)?fmt(c.massPct,6)+" %":"-";
+  document.getElementById("upct-"+i).textContent=isFinite(c.massPct)?fmt(c.massPct,9)+" %":"-";
   document.getElementById("upill-"+i).innerHTML=c.pill;
   updateUnkSummary();
 }
