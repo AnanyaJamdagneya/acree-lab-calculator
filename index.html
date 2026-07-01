@@ -373,7 +373,7 @@
         <h4>Figuring out the dilution from your reading</h4>
         <p>Use the <b>Dilution Factor Finder</b> on the page, or do it yourself:</p>
         <ol>
-          <li><b>In between</b> the absorbance of Standard 3 and Standard 10 &rarr; no dilution, use <b>1/10</b>.</li>
+          <li><b>In the sweet spot</b> (around Standards 5 to 7) &rarr; no dilution, use <b>1/10</b>. If it is in range but near the very top (9/10) or very bottom (3), the finder will still nudge it toward the middle.</li>
           <li><b>Above</b> that range (too concentrated) &rarr; dilution = (absorbance of 10 minus absorbance of 3) divided by your reading. Example: if that gives 0.6, your dilution is <b>6/10</b>. Fill the beaker to the line with isopropyl, <span class="inv">INVERT INVERT INVERT!</span> Take a 10 mL flask, and with the red squishy thing and the rod (the one that goes up to 10 mL) bring isopropyl up to the 6 mL line and add that to the 10 mL flask. Top up with isopropyl to the line, <span class="inv">INVERT INVERT INVERT!</span>, put into the cuvette, wipe with tp, into the Milton, and read it again.</li>
           <li><b>Below</b> that range (too dilute) &rarr; redo it in a 25 mL flask instead of 50. In the Dilution Finder just hit "Switch flasks to 25 mL" and the app handles the math.</li>
         </ol>
@@ -455,16 +455,24 @@ function findDilution(reading){
   const {lo,hi}=absRange();
   if(!isFinite(reading)) return {tone:"mute", big:"Enter a reading", steps:"Type the value the spectrometer gave you.", factor:null};
   if(!isFinite(lo)||!isFinite(hi)) return {tone:"mute", big:"Need standards", steps:"Fill in Standard 3 and Standard 10 absorbances first.", factor:null};
-  if(reading>=lo && reading<=hi)
-    return {tone:"ok", big:"1 / 10", factor:"1/10", steps:"In range! No dilution needed. Use a dilution factor of 1/10."};
-  if(reading>hi){
-    const raw=(hi-lo)/reading;
-    const k=Math.max(1, Math.round(raw*10));
+  // sweet-spot band, roughly around Standards 5 to 7 (use Standard 4 and 8 as edges, or a fraction of the range)
+  const s4=S.standards.find(s=>s.n===4), s8=S.standards.find(s=>s.n===8);
+  const a4=s4?num(s4.abs):NaN, a8=s8?num(s8.abs):NaN;
+  const sweetLo=isFinite(a4)?a4:lo+0.22*(hi-lo);
+  const sweetHi=isFinite(a8)?a8:lo+0.75*(hi-lo);
+  if(reading>sweetHi){
+    const k=Math.max(1, Math.round((hi-lo)/reading*10));
+    const edge = reading<=hi ? "In range but near the top (close to Standards 9 and 10). " : "Too high. ";
     return {tone:"warn", big:k+" / 10", factor:k+"/10",
-      steps:"Too high, so dilute. Take a 10 mL flask, pipette "+k+" mL into it, fill to the line with isopropyl, invert, read again, then use "+k+"/10."};
+      steps:edge+"Dilute to bring it into the sweet spot (around Standards 5 to 7). Take a 10 mL flask, pipette "+k+" mL in, fill to the line with isopropyl, invert, read again, then use "+k+"/10."};
   }
-  return {tone:"bad", big:"25 mL flask", factor:null, action:"flask25",
-    steps:"Too low for the 50 mL flask. Redo the first dilution in a 25 mL flask instead - that doubles the concentration, and the app runs the exact same calculation just with 25 mL. Hit the button to switch."};
+  if(reading<sweetLo){
+    const edge = reading>=lo ? "In range but near the bottom (close to Standard 3). " : "Too low. ";
+    return {tone:"bad", big:"25 mL flask", factor:null, action:"flask25",
+      steps:edge+"Redo the first dilution in a 25 mL flask instead of 50, which roughly doubles the concentration and brings it into the sweet spot (around Standards 5 to 7). The app runs the same calculation, just with 25 mL. Hit the button to switch."};
+  }
+  return {tone:"ok", big:"1 / 10", factor:"1/10",
+    steps:"Right in the sweet spot (around Standards 5 to 7). No dilution needed, use 1/10."};
 }
 
 //==================== RENDER ====================
